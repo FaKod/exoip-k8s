@@ -23,7 +23,10 @@ import (
 	"os"
 	"time"
 
-	election "github.com/exoip-k8s/lib"
+	election "github.com/exoip-k8s/pkg/election"
+	eng "github.com/exoip-k8s/pkg/engine"
+	exoapi "github.com/exoip-k8s/pkg/exoapi"
+	log "github.com/exoip-k8s/pkg/logger"
 
 	"github.com/golang/glog"
 	flag "github.com/spf13/pflag"
@@ -31,18 +34,24 @@ import (
 	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	kubectl_util "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+
+	"github.com/pyr/egoscale/src/egoscale"
 )
 
 var (
 	flags = flag.NewFlagSet(
-		`elector --election=<name>`,
+		`elector --name=<name>`,
 		flag.ExitOnError)
-	name      = flags.String("election", "", "The name of the election")
-	id        = flags.String("id", "", "The id of this participant")
-	namespace = flags.String("election-namespace", api.NamespaceDefault, "The Kubernetes namespace for this election")
-	ttl       = flags.Duration("ttl", 10*time.Second, "The TTL for this election")
-	inCluster = flags.Bool("use-cluster-credentials", false, "Should this request use cluster credentials?")
-	addr      = flags.String("http", "", "If non-empty, stand up a simple webserver that reports the leader state")
+	name        = flags.String("name", "", "The name of the security group")
+	id          = flags.String("id", "", "The id of this participant")
+	namespace   = flags.String("election-namespace", api.NamespaceDefault, "The Kubernetes namespace for this election")
+	ttl         = flags.Duration("ttl", 10*time.Second, "The TTL for this election")
+	inCluster   = flags.Bool("use-cluster-credentials", false, "Should this request use cluster credentials?")
+	addr        = flags.String("http", "", "If non-empty, stand up a simple webserver that reports the leader state")
+	exoKey      = flags.String("xk", "", "Exoscale API Key")
+	exoSecret   = flags.String("xs", "", "Exoscale API Secret")
+	exoEndpoint = flags.String("xe", "https://api.exoscale.ch/compute", "Exoscale API Endpoint")
+	eip         = flags.String("xi", "", "Exoscale Elastic IP to watch over")
 
 	leader = &LeaderData{}
 )
@@ -89,20 +98,65 @@ func validateFlags() {
 	}
 }
 
+type envEquiv struct {
+	Env  string
+	Flag string
+}
+
+type equivList []envEquiv
+
+func parseEnvironment() {
+
+	envFlags := equivList{
+		envEquiv{Env: "IF_ADDRESS", Flag: "xi"},
+		envEquiv{Env: "IF_EXOSCALE_API_KEY", Flag: "xk"},
+		envEquiv{Env: "IF_EXOSCALE_API_SECRET", Flag: "xs"},
+		envEquiv{Env: "IF_EXOSCALE_API_ENDPOINT", Flag: "xe"},
+		envEquiv{Env: "IF_EXOSCALE_PEER_GROUP", Flag: "name"},
+	}
+
+	for _, env := range envFlags {
+		v := os.Getenv(env.Env)
+		if len(v) > 0 {
+			flags.Set(env.Flag, v)
+		}
+	}
+}
+
 func main() {
+	parseEnvironment()
 	flags.Parse(os.Args)
 	validateFlags()
+
+	log.SetupLogger(true)
 
 	kubeClient, err := makeClient()
 	if err != nil {
 		glog.Fatalf("error connecting to the client: %v", err)
 	}
 
+	egoClient := egoscale.NewClient(*exoEndpoint, *exoKey, *exoSecret)
+
+	sgpeers, err := exoapi.GetSecurityGroupPeers(egoClient, *name)
+	if err != nil {
+		glog.Error("cannot build peer list from security-group")
+		fmt.Fprintf(os.Stderr, "cannot build peer list from security-group: %s\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("%v\n", sgpeers)
+	var engine = eng.NewEngine(egoClient, *eip, sgpeers)
+
 	fn := func(str string) {
 		leader.Name = str
 		fmt.Printf("%s is the leader\n", leader.Name)
 		if str == *id {
 			glog.Info("hi its me")
+			glog.Info("killing all Peers and adding me")
+			glog.Info("My Nic: ", engine.NicID)
+			for _, p := range engine.Peers {
+				glog.Info("NicId: ", p.NicID)
+			}
 		}
 	}
 
