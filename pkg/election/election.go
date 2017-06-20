@@ -66,11 +66,12 @@ func NewElection(electionId, id, namespace string, ttl time.Duration, callback L
 		}
 	}
 
-	leader, endpoints, err := getCurrentLeader(electionId, namespace, c)
+	/*_ was leader*/
+	_, endpoints, err := getCurrentLeader(electionId, namespace, c)
 	if err != nil {
 		return nil, err
 	}
-	callback.OnNewLeader(leader)
+	//callback.OnNewLeader(leader)
 
 	broadcaster := record.NewBroadcaster()
 	hostname, err := os.Hostname()
