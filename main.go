@@ -131,17 +131,22 @@ func main() {
 	fmt.Printf("%v\n", sgpeers)
 	var engine = eng.NewEngine(egoClient, *eip, sgpeers)
 
-	fn := func(str string) {
-		leader.Name = str
-		fmt.Printf("%s is the leader\n", leader.Name)
-		if str == *id {
-			glog.Info("hi its me")
-			glog.Info("killing all Peers and adding me")
-			glog.Info("My Nic: ", engine.NicID)
-			for _, p := range engine.Peers {
-				glog.Info("NicId: ", p.NicID)
+	fn := election.LeaderCallbacks{
+		OnStartedLeading: func(leader string) {
+		},
+		OnStoppedLeading: func(leader string) {
+		},
+		OnNewLeader: func(leader string) {
+			fmt.Printf("%s is the leader\n", leader)
+			if leader == *id {
+				glog.Info("hi its me")
+				glog.Info("killing all Peers and adding me")
+				glog.Info("My Nic: ", engine.NicID)
+				for _, p := range engine.Peers {
+					glog.Info("NicId: ", p.NicID)
+				}
 			}
-		}
+		},
 	}
 
 	e, err := election.NewElection(*name, *id, *namespace, *ttl, fn, kubeClient)
