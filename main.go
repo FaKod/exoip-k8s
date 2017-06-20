@@ -140,10 +140,14 @@ func main() {
 			fmt.Printf("%s is the leader\n", leader)
 			if leader == *id {
 				glog.Info("hi its me")
-				glog.Info("killing all Peers and adding me")
-				glog.Info("My Nic: ", engine.NicID)
 				for _, p := range engine.Peers {
-					glog.Info("NicId: ", p.NicID)
+					if p.NicID == engine.NicID {
+						glog.Info("Obtain Nic: ", p.NicID)
+						engine.ObtainNic(p.NicID)
+					} else {
+						glog.Info("Relese Nic: ", p.NicID)
+						engine.ReleaseNic(p.NicID)
+					}
 				}
 			}
 		},
