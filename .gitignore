@@ -1,2 +1,2 @@
 exoip-k8s
-deployment.yaml
+deployment*.yaml
