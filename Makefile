@@ -1,6 +1,6 @@
 all: exoip-k8s
 
-TAG = 0.0.1
+TAG = 0.0.2
 PREFIX = innoq/exoip-k8s
 
 exoip-k8s:
