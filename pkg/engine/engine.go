@@ -26,16 +26,38 @@ type Engine struct {
 
 // ObtainNic Optaining a given nicID to ExoIP
 func (engine *Engine) ObtainNic(nicID string) error {
-
-	_, err := engine.Exo.AddIpToNic(nicID, engine.ExoIP.String())
+	vms, err := engine.Exo.ListVirtualMachines()
 	if err != nil {
-		log.Logger.Crit(fmt.Sprintf("could not add ip %s to nic %s: %s",
-			engine.ExoIP.String(),
-			nicID,
+		log.Logger.Crit(fmt.Sprintf("could not fetch ip from nic: could not list virtualmachines: %s",
 			err))
 		return err
 	}
-	log.Logger.Info(fmt.Sprintf("claimed ip %s on nic %s", engine.ExoIP.String(), nicID))
+
+	addIp := true
+	for _, vm := range vms {
+		if vm.Nic[0].Id == nicID {
+			for _, secIP := range vm.Nic[0].Secondaryip {
+				if secIP.IpAddress == engine.ExoIP.String() {
+					addIp = false
+					break
+				}
+			}
+		}
+	}
+
+	if addIp {
+		_, err := engine.Exo.AddIpToNic(nicID, engine.ExoIP.String())
+		if err != nil {
+			log.Logger.Crit(fmt.Sprintf("could not add ip %s to nic %s: %s",
+				engine.ExoIP.String(),
+				nicID,
+				err))
+			return err
+		}
+		log.Logger.Info(fmt.Sprintf("claimed ip %s on nic %s", engine.ExoIP.String(), nicID))
+	} else {
+		log.Logger.Info(fmt.Sprintf("ip %s on nic %s is already present", engine.ExoIP.String(), nicID))
+	}
 	return nil
 }
 
