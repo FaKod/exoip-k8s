@@ -97,6 +97,7 @@ func parseEnvironment() {
 		envEquiv{Env: "IF_EXOSCALE_API_SECRET", Flag: "xs"},
 		envEquiv{Env: "IF_EXOSCALE_API_ENDPOINT", Flag: "xe"},
 		envEquiv{Env: "IF_EXOSCALE_PEER_GROUP", Flag: "name"},
+		envEquiv{Env: "EP_NAMESPACE", Flag: "election-namespace"},
 	}
 
 	for _, env := range envFlags {
